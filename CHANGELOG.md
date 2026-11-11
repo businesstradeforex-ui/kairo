@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.0 — 2026-11-11
+
+Paquets autonomes. Python et les dépendances sont dans l'archive : il n'y a plus rien à installer à part, si ce n'est l'IA locale que vous choisissez.
+
+- Release GitHub sur un tag `v*` (et un lancement manuel) : macOS arm64 et Intel (dmg + zip), Windows x64 (zip), Linux x64 et arm64 (tar.gz, deb, AppImage).
+- Premier lancement : dossier de données, clé de chiffrement, navigateur, détection d'Ollama / LM Studio / llama.cpp, page `/setup` si rien n'écoute.
+- Image `ghcr.io/businesstradeforex-ui/kairo` (amd64 et arm64). Ollama dans Compose est optionnel (`--profile ai`).
+- `curl | bash` et `install.ps1` téléchargent la dernière release.
+- `pipx install` depuis le dépôt git (`pyproject.toml`). Les manifests Homebrew, Scoop et winget sont produits par la release (empreintes réelles) et joints aux fichiers. Ils ne sont pas publiés dans un tap séparé ni soumis à winget-pkgs : voir le README.
+
+Le trading réel reste désactivé par défaut.
+
 ## 0.1.0 — 2026-11-11
 
 Première publication publique de Kairo.

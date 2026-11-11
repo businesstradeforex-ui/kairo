@@ -1,5 +1,25 @@
 # Installer Kairo sur macOS
 
+## Paquet (recommandé)
+
+Apple Silicon : `Kairo-<version>-macos-arm64.dmg`. Intel : `Kairo-<version>-macos-intel.dmg`. Les deux sont aussi en `.zip`.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/businesstradeforex-ui/kairo/main/install.sh | bash
+```
+
+Ou ouvrez le dmg et glissez Kairo dans Applications.
+
+L'app n'est pas signée (pas de compte développeur Apple dans cette release). Gatekeeper bloque le premier double-clic.
+
+1. Clic droit sur Kairo → **Ouvrir**, puis **Ouvrir** dans la boîte de dialogue.
+2. Si macOS a déjà refusé : Réglages Système → Confidentialité et sécurité → « Ouvrir quand même ».
+3. En dernier recours, dans le Terminal : `xattr -dr com.apple.quarantine ~/Applications/Kairo.app`
+
+Le premier lancement crée `~/Library/Application Support/Kairo` (données et `secret.key`, chmod 700) et ouvre le navigateur. Sans Ollama, LM Studio ou llama.cpp, la page http://127.0.0.1:8787/setup explique comment en brancher un. Le desk papier fonctionne sans modèle.
+
+## Depuis les sources
+
 Le desk lui-même est léger. Un MacBook Air M1 suffit. L'IA locale est optionnelle : sans elle, les ordres JSON et les phrases simples (« pause », « mode profit », « liquidité min 20k ») fonctionnent quand même.
 
 1. Installez [Homebrew](https://brew.sh) si besoin.
