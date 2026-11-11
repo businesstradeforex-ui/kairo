@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000">
+<meta name="robots" content="noindex">
+<title>Propriétaire · Kairo</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<div id="app">
+  <header class="top"><a href="/" style="color:#fff;text-decoration:none">‹</a><h1>Propriétaire</h1></header>
+  <p class="muted small">Espace privé. L'assistant distant utilise un jeton à scopes, révocable. Personne d'autre ne voit cette page.</p>
+  <div class="card" id="state">chargement…</div>
+  <h3 class="sec-h">Nouveau jeton</h3>
+  <form id="tok" class="card">
+    <input id="tname" placeholder="nom (ex. grok)" maxlength="40" style="width:100%;margin-bottom:8px;background:#2C2C2E;border:0;border-radius:12px;color:#fff;padding:12px">
+    <button class="btn-out" style="color:#32D74B" type="submit">Créer (affiché une fois)</button>
+    <pre id="once" class="small"></pre>
+  </form>
+  <div class="card" id="tokens"></div>
+</div>
+<script src="/admin.js"></script>
+</body>
+</html>

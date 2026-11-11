@@ -1,0 +1,21 @@
+*{box-sizing:border-box}
+body{margin:0;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",Inter,system-ui,sans-serif;min-height:100vh;display:grid;place-items:center;padding:24px}
+.box{width:100%;max-width:380px}
+.brand{display:flex;gap:12px;align-items:center;margin-bottom:22px}
+.brand img{width:44px;height:44px;border-radius:12px}
+.t1{font-weight:700;font-size:22px;letter-spacing:-.4px}
+.t2{color:#8E8E93;font-size:14px}
+.card{background:#1C1C1E;border-radius:18px;padding:18px}
+label{display:block;color:#8E8E93;font-size:13px;margin:0 0 6px 2px}
+input{width:100%;background:#2C2C2E;border:0;border-radius:12px;color:#fff;font-size:17px;padding:14px;margin-bottom:12px;outline:none}
+input:focus{box-shadow:0 0 0 2px #32D74B}
+button,.alt{width:100%;border:0;border-radius:14px;font-size:16px;font-weight:700;padding:13px;margin-top:6px;font-family:inherit}
+button.primary{background:#32D74B;color:#000}
+.alt{display:block;text-align:center;text-decoration:none;background:#2C2C2E;color:#fff}
+.err{background:rgba(255,69,58,.15);color:#FF453A;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:14px}
+.note{color:#8E8E93;font-size:12px;text-align:center;margin-top:14px;line-height:1.45}
+.paper{display:inline-block;background:#FF9F0A;color:#000;font-weight:700;font-size:11px;border-radius:6px;padding:2px 6px}
+.switch{margin-top:14px;text-align:center}
+.switch button{background:none;color:#32D74B;width:auto;padding:8px}
+.row2{display:flex;gap:8px}
+.row2 button{flex:1}
