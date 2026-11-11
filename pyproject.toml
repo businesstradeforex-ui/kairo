@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kairo"
-version = "1.0.0"
+version = "1.1.0"
 description = "Solana memecoin paper desk. Six agents, local AI as the executor, live trading off by default."
 readme = "README.md"
 requires-python = ">=3.10"

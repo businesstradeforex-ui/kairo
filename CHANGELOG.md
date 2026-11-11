@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.1.0 — 2026-11-11
+
+Kairo.app est une application Mac, plus seulement un serveur qui ouvre Safari.
+
+- Fenêtre native (WKWebView via pywebview), icône Dock, menu (À propos, Préférences, Quitter), taille et position mémorisées.
+- Icône dans la barre des menus : état du desk, équité, Ouvrir, Pause ou Reprendre, Quitter.
+- Le desk démarre avec l'app et s'arrête sur Quitter. Préférences : rester en arrière-plan quand la fenêtre se ferme, ouvrir à la connexion, notifications des trades clôturés.
+- Écran d'accueil : détection Ollama, conseil de modèle selon la RAM et le disque libre (au moins 4 Go gardés), téléchargement avec progression, test de connexion.
+- Le `.dmg` est signé ad hoc (`codesign -`) pour Apple Silicon. Gatekeeper : Réglages Système → Confidentialité et sécurité → Ouvrir quand même, ou `xattr -dr com.apple.quarantine /Applications/Kairo.app`.
+- Windows utilise la même fenêtre si pywebview est dans le zip. Linux reste sur le navigateur.
+
+Paper par défaut. Trading réel éteint.
+
 ## 1.0.0 — 2026-11-11
 
 Paquets autonomes. Python et les dépendances sont dans l'archive : il n'y a plus rien à installer à part, si ce n'est l'IA locale que vous choisissez.

@@ -29,6 +29,8 @@ Rien à compiler. Le paquet embarque Python. Il ne reste qu'à brancher une IA l
 
 Les liens ouvrent la dernière release. Le fichier exact s'appelle `Kairo-<version>-<plateforme>.*`.
 
+Sur Mac, **Kairo.app** (1.1.0) ouvre sa propre fenêtre, une icône dans le Dock et une icône dans la barre des menus. Ce n'est plus un onglet de navigateur. L'app n'est pas signée par Apple : Réglages Système → Confidentialité et sécurité → Ouvrir quand même, ou `xattr -dr com.apple.quarantine /Applications/Kairo.app`.
+
 Une ligne, macOS ou Linux (bash) :
 
 ```bash
@@ -45,7 +47,7 @@ macOS, app non signée : la première fois, clic droit sur Kairo puis **Ouvrir**
 
 Au premier lancement, l'application crée son dossier de données et sa clé de chiffrement, ouvre le navigateur, et cherche Ollama, LM Studio ou llama.cpp. Sinon elle affiche http://127.0.0.1:8787/setup . Le trading réel reste éteint.
 
-Image Docker : [docs/install/docker.md](docs/install/docker.md). Notes de la 1.0.0 : [docs/release-notes/v1.0.0.md](docs/release-notes/v1.0.0.md).
+Image Docker : [docs/install/docker.md](docs/install/docker.md). Notes : [1.1.0](docs/release-notes/v1.1.0.md).
 
 Si Python est déjà là : `pipx install "kairo @ git+https://github.com/businesstradeforex-ui/kairo.git"` puis `kairo`. Chaque release joint aussi `kairo.rb` (cask Homebrew, arm et Intel), `kairo.json` (Scoop) et un manifeste winget. Ils ne sont pas poussés dans un tap ni soumis à winget-pkgs : les empreintes ne sont connues qu'une fois les fichiers construits. Le chemin supporté, lui, est `install.sh` / `install.ps1`.
 

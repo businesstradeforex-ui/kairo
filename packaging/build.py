@@ -56,12 +56,19 @@ def python_bin(prefix: Path):
             return p
     raise SystemExit(f"python introuvable dans {prefix}")
 
-def pip_install(py: Path):
+def pip_install(py: Path, target=""):
     env = dict(os.environ)
     env.pop("PYTHONPATH", None)
     env.update(PIP_DISABLE_PIP_VERSION_CHECK="1", PYTHONNOUSERSITE="1", PIP_USER="0")
     subprocess.check_call([str(py), "-s", "-m", "pip", "install", "--upgrade", "pip"], env=env)
     subprocess.check_call([str(py), "-s", "-m", "pip", "install", "--no-cache-dir", "-r", str(REQ)], env=env)
+    extras = []
+    if target.startswith("macos"):
+        extras = ["pywebview>=5.3", "pyobjc-framework-Cocoa>=10.3", "pyobjc-framework-WebKit>=10.3", "Pillow>=10.4"]
+    elif target.startswith("windows"):
+        extras = ["pywebview>=5.3", "Pillow>=10.4"]
+    if extras:
+        subprocess.check_call([str(py), "-s", "-m", "pip", "install", "--no-cache-dir", *extras], env=env)
 
 README = """Kairo {version} — paper trading
 ================================
@@ -113,6 +120,8 @@ export KAIRO_ENV="${KAIRO_ENV:-production}"
 export DESK_HOST="${DESK_HOST:-127.0.0.1}"
 export DESK_PORT="${DESK_PORT:-8787}"
 export KAIRO_MULTIUSER="${KAIRO_MULTIUSER:-1}"
+export KAIRO_DESKTOP="${KAIRO_DESKTOP:-1}"
+export KAIRO_APP_PATH="$(cd "$(dirname "$0")/../.." && pwd)"
 PY="$ROOT/python/bin/python3"
 [ -x "$PY" ] || PY="$ROOT/python/bin/python"
 exec "$PY" "$ROOT/app/launcher.py" "$@"
@@ -126,6 +135,7 @@ if not defined KAIRO_ENV set "KAIRO_ENV=production"
 if not defined DESK_HOST set "DESK_HOST=127.0.0.1"
 if not defined DESK_PORT set "DESK_PORT=8787"
 if not defined KAIRO_MULTIUSER set "KAIRO_MULTIUSER=1"
+if not defined KAIRO_DESKTOP set "KAIRO_DESKTOP=1"
 "%ROOT%python\\python.exe" "%ROOT%app\\launcher.py" %*
 """
 
@@ -143,7 +153,9 @@ def info_plist(version):
   <key>CFBundleShortVersionString</key><string>{version}</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleExecutable</key><string>kairo</string>
+  <key>CFBundleIconFile</key><string>kairo</string>
   <key>LSMinimumSystemVersion</key><string>12.0</string>
+  <key>LSApplicationCategoryType</key><string>public.app-category.finance</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
 </dict></plist>
@@ -168,6 +180,8 @@ def assemble(target, version, tarball: Path, out_dir: Path):
         launch = app / "MacOS" / "kairo"
         launch.write_text(MAC_LAUNCH, encoding="utf-8")
         mark_exec(launch)
+        from make_icns import write_icns
+        write_icns(res / "kairo.icns")
         write_readme(stage, version)
         py = python_bin(res / "python")
     elif target.startswith("windows"):
@@ -196,7 +210,7 @@ def assemble(target, version, tarball: Path, out_dir: Path):
         py = python_bin(stage / "python")
     # Only install wheels when the bundled interpreter can run here.
     if _can_run(py):
-        pip_install(py)
+        pip_install(py, target)
     else:
         print(f"skip pip on this host (interpreter {py} is for another OS)", flush=True)
     out_dir.mkdir(parents=True, exist_ok=True)

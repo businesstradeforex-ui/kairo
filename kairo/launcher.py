@@ -55,6 +55,14 @@ def _open_when_ready(url):
 
 def main(argv=None):
     _data, report = prepare()
+    desktop_on = os.environ.get("KAIRO_DESKTOP") == "1" and os.environ.get("KAIRO_NO_BROWSER") != "1"
+    if desktop_on:
+        try:
+            import desktop
+        except ImportError as exc:
+            print(f"Kairo : module desktop absent ({exc}).", flush=True)
+        else:
+            return desktop.main(report)
     port = os.environ.get("DESK_PORT", "8787")
     url = f"http://127.0.0.1:{port}/" + ("login" if report["ok"] else "setup")
     _open_when_ready(url)

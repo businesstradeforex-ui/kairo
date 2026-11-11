@@ -88,6 +88,8 @@ jobs:
           target="${{ matrix.target }}"
           python3 packaging/build.py --target "$target" --version "$ver" --formats zip
           stage=$(find dist/tree -maxdepth 1 -type d -name "Kairo-*" | head -1)
+          codesign --force --deep --sign - "$stage/Kairo.app"
+          codesign --verify --verbose=2 "$stage/Kairo.app"
           hdiutil create -volname Kairo -srcfolder "$stage/Kairo.app" -ov -format UDZO "dist/Kairo-${ver}-${target}.dmg"
       - name: Windows zip
         if: runner.os == 'Windows'
