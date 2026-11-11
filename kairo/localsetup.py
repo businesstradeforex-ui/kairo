@@ -77,10 +77,8 @@ def status(ram=None, disk=None, installed=None):
     advice = model_advice.recommend(ram, disk, tags.get("models") or [])
     chosen = ""
     try:
-        import common
-        path = os.path.join(common.data_dir(), "model.txt")
-        if os.path.exists(path):
-            chosen = open(path, encoding="utf-8").read().strip()
+        import ai_local
+        chosen = ai_local.current_model()
     except Exception:
         chosen = ""
     with _lock:
@@ -89,11 +87,12 @@ def status(ram=None, disk=None, installed=None):
             "free_disk_gb": round(disk, 1), "advice": advice, "selected": chosen, "pull": pull,
             "paper": True, "live": os.environ.get("KAIRO_LIVE_ENABLED", "0") == "1"}
 
-def use_model(name):
+def use_model(name, scope="global"):
     if not safe_name(name):
         raise ValueError("nom de modèle refusé")
     import common
-    path = os.path.join(common.data_dir(), "model.txt")
+    folder = common.data_dir() if scope == "user" else common.BASE
+    path = os.path.join(folder, "model.txt")
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         f.write(name + "\n")

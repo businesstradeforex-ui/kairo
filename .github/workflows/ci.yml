@@ -20,3 +20,8 @@ jobs:
         run: ruff check kairo tests
       - name: Tests
         run: python -m unittest discover -s tests -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Chart tests
+        run: node --test tests/chart-math.test.mjs

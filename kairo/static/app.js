@@ -1,6 +1,11 @@
-"use strict";
+import { drawChart, hitTest, prepareSeries } from "./js/chart-view.js";
+import { activeCount, scoutCounts } from "./js/mappers.js";
+import { getJSON } from "./js/net.js";
+
 const $ = s => document.querySelector(s);
+window.$ = $;
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+window.esc = esc;
 const fr2 = n => Number(n).toLocaleString("fr-FR", {minimumFractionDigits: 2, maximumFractionDigits: 2});
 let FX = 1.08, BANK = 1080, BANK_EUR = 1000; // USD per EUR (live, from /api/all); portfolio shown in EUR
 const usd = (n, sign) => { if (n == null || isNaN(n)) return "—"; n = n / FX; const s = n < 0 ? "-" : (sign ? "+" : ""); return s + fr2(Math.abs(n)) + " €"; };
@@ -8,9 +13,10 @@ const usdK = n => { if (n == null) return "—"; n = +n / FX; return n >= 1e6 ? 
 const pct = (n, sign = true) => n == null || isNaN(n) ? "—" : (sign && n > 0 ? "+" : "") + Number(n).toLocaleString("fr-FR", {maximumFractionDigits: 1, minimumFractionDigits: 1}) + " %";
 const price = p => { if (!p) return "—"; p = +p; if (p >= 1) return "$" + fr2(p); const d = Math.max(2, Math.ceil(-Math.log10(p)) + 3); return "$" + p.toLocaleString("fr-FR", {maximumFractionDigits: Math.min(d, 12), minimumFractionDigits: Math.min(d, 12)}); };
 const hhmm = ts => ts ? new Date(ts).toLocaleTimeString("fr-FR", {hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris"}) : "";
+window.hhmm = hhmm;
 const avatar = (icon, sym) => icon ? `<div class="av" style="background-image:url('${esc(icon)}')"></div>` : `<div class="av">${esc((sym||"?").slice(0,2).toUpperCase())}</div>`;
 const CK = {cycle:"cycle",candidates:"candidats",mints_seen:"mints scannés",new_discovered:"nouveaux",watchlist:"surveillés",pairs_fetched:"paires lues",in:"entrants",killed:"éliminés",survivors:"survivants",top_reason:"motif n°1",scored:"notés",passed_70:"validés",passed:"validés",seuil:"seuil",entries:"entrées",equity:"equity",open:"ouvertes",exits:"sorties",exits_tick:"sorties",cycles:"cycles",kill_rows:"lignes de kill"};
-let D = null, tf = "live", seen = null, actFilter = "all";
+let D = null, tf = "all", seen = null, actFilter = "all", chartSeries = null, chartMap = null, polling = false;
 const seuil = () => (D && D.config && D.config.analyst && D.config.analyst.seuil) || 70;
 const profileName = () => (D && ((D.config && D.config.profile) || (D.summary && D.summary.profile))) || "profit";
 const profileLabel = () => (D && ((D.config && D.config.profile_label) || (D.summary && D.summary.profile_label))) || "Mode profit";
@@ -41,6 +47,7 @@ function toast(text) {
   $("#toasts").prepend(t);
   setTimeout(() => { t.classList.add("out"); setTimeout(() => t.remove(), 450); }, 5200);
 }
+window.toast = toast;
 function checkToasts(act) {
   const trades = act.filter(e => e.type !== "kill");
   if (seen === null) { seen = new Set(trades.map(e => e.id)); return; }
@@ -53,37 +60,39 @@ function checkToasts(act) {
   });
 }
 
-/* ---------- equity chart (smooth spline) ---------- */
+/* ---------- equity chart ---------- */
 function drawEquity(curve) {
-  const svg = $("#eqchart"), W = 400, H = 190, pad = 14;
-  const now = Date.now(), win = {live: 30*60e3, "1h": 3600e3, "4h": 4*3600e3, "1d": 864e5, "1w": 7*864e5, all: Infinity}[tf];
-  curve = curve.slice().sort((a, b) => new Date(a.ts) - new Date(b.ts));
-  let pts = curve.filter(p => now - new Date(p.ts) <= win);
-  if (pts.length < 2) pts = curve.slice(-2);
-  if (pts.length > 120) { const step = pts.length / 120; pts = [...Array(120).keys()].map(i => pts[Math.floor(i * step)]).concat([curve[curve.length - 1]]); pts = pts.filter((p, i) => !i || p !== pts[i-1]); }
-  if (!pts.length) { svg.innerHTML = ""; return; }
-  const ys = pts.map(p => p.equity); let lo = Math.min(...ys), hi = Math.max(...ys);
-  if (hi - lo < 1) { lo -= 5; hi += 5; }
-  const t0 = new Date(pts[0].ts).getTime(), t1 = new Date(pts[pts.length - 1].ts).getTime() || t0 + 1;
-  const xy = pts.map((p, i) => [pts.length === 1 ? W/2 : pad + (W - 2*pad - 40) * (t1 > t0 ? (new Date(p.ts) - t0) / (t1 - t0) : i / (pts.length - 1)), pad + 20 + (H - 2*pad - 30) * (1 - (p.equity - lo) / (hi - lo))]);
-  let d = `M${xy[0][0]},${xy[0][1]}`;
-  // monotone curve: control points stay between neighbours in x (never goes back in time) and in y (no overshoot)
-  for (let i = 0; i < xy.length - 1; i++) { const p0 = xy[i-1] || xy[i], p1 = xy[i], p2 = xy[i+1], p3 = xy[i+2] || p2;
-    const dx = (p2[0] - p1[0]) / 3, lo2 = Math.min(p1[1], p2[1]), hi2 = Math.max(p1[1], p2[1]), cl = v => Math.max(lo2, Math.min(hi2, v));
-    const m1 = (p2[0] - p0[0]) ? (p2[1] - p0[1]) / (p2[0] - p0[0]) : 0, m2 = (p3[0] - p1[0]) ? (p3[1] - p1[1]) / (p3[0] - p1[0]) : 0;
-    d += ` C${p1[0] + dx},${cl(p1[1] + m1 * dx)} ${p2[0] - dx},${cl(p2[1] - m2 * dx)} ${p2[0]},${p2[1]}`; }
-  const up = pts[pts.length-1].equity >= pts[0].equity, col = up ? "#32D74B" : "#FF453A";
-  const last = xy[xy.length - 1], every = Math.max(1, Math.ceil(xy.length / 14));
-  svg.innerHTML = `<defs><linearGradient id="gf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".38"/><stop offset="1" stop-color="#000" stop-opacity="0"/></linearGradient></defs>
-    <path d="${d} L${last[0]},${H} L${xy[0][0]},${H} Z" fill="url(#gf)"/>
-    <path d="${d}" fill="none" stroke="${col}" stroke-width="2.4" stroke-linecap="round"/>
-    ${xy.filter((_, i) => i % every === 0).map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="2.2" fill="${col}" opacity=".7"/>`).join("")}
-    <circle cx="${last[0]}" cy="${last[1]}" r="9" fill="${col}" opacity=".2"><animate attributeName="r" values="5;11;5" dur="1.8s" repeatCount="indefinite"/></circle>
-    <circle cx="${last[0]}" cy="${last[1]}" r="4.5" fill="${col}" stroke="#000" stroke-width="2"/>`;
-  const dl = pts[pts.length-1].equity - (pts.length > 1 ? pts[pts.length-2].equity : pts[0].equity);
-  const lp = $("#lastpill"), r = svg.getBoundingClientRect();
-  lp.textContent = usd(dl, true); lp.className = "lastpill" + (dl < 0 ? " down" : "");
-  lp.style.left = (last[0] / W * r.width + 6) + "px"; lp.style.top = (last[1] / H * r.height) + "px";
+  const canvas = $("#eqchart");
+  if (!canvas) return;
+  const now = Date.now();
+  chartSeries = prepareSeries(curve || [], tf, now, BANK);
+  const drawn = drawChart(canvas, chartSeries);
+  chartMap = drawn.map;
+  const lp = $("#lastpill");
+  const delta = chartSeries.delta;
+  if (delta == null || !drawn.last) {
+    lp.hidden = true;
+    return;
+  }
+  lp.hidden = false;
+  lp.textContent = usd(delta, true);
+  lp.className = "lastpill" + (delta < -0.005 ? " down" : "");
+  lp.style.left = Math.max(8, Math.min(drawn.cssW - 72, drawn.last.x + 8)) + "px";
+  lp.style.top = Math.max(4, drawn.last.y - 18) + "px";
+}
+function scrub(ev) {
+  const canvas = $("#eqchart");
+  const tip = $("#chart-tip");
+  if (!canvas || !tip || !chartSeries) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = (ev.clientX != null ? ev.clientX : ev.touches[0].clientX) - rect.left;
+  const hit = hitTest(chartMap, x);
+  if (!hit) { tip.hidden = true; return; }
+  tip.hidden = false;
+  const when = new Date(hit.t).toLocaleString("fr-FR", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "short", timeZone: "Europe/Paris" });
+  tip.textContent = when + " · " + usd(hit.equity - (tf === "all" ? BANK : chartSeries.flat[0].equity), true);
+  tip.style.left = Math.max(8, Math.min(rect.width - 120, hit.x)) + "px";
+  tip.style.top = Math.max(4, hit.y - 28) + "px";
 }
 
 /* ---------- agent cards ---------- */
@@ -97,7 +106,7 @@ function agentCards() {
   const feedHtml = arr => arr.length ? arr.map(l => `<div><b>${esc(l.symbol)}</b><span class="${l.kind === "pass" ? "p" : "k"} x">${esc(l.text_fr)}</span></div>`).join("") : `<div class="x">en attente du prochain cycle…</div>`;
   const sc = top ? top.score : 0, C = 2 * Math.PI * 44;
   const cards = {
-    scout: `<div class="as">${(A.scout.counters || {}).candidates ?? 0} paires dans la fenêtre · ${(A.scout.counters || {}).mints_seen ?? 0} scannées</div><div class="feed" style="margin-top:8px">${feedHtml(feed.slice(0, 5))}</div>`,
+    scout: `<div class="as">${(() => { const sc = scoutCounts(A.scout, S, D.cycles); const p = sc.pairs == null ? "—" : sc.pairs; const n = sc.scanned == null ? "—" : sc.scanned; return `${p} paires dans la fenêtre · ${n} scannées`; })()}</div><div class="feed" style="margin-top:8px">${feedHtml(feed.slice(0, 5))}</div>`,
     filter: `<div class="big">${S.killed_tokens ?? 0} <span class="muted small">tokens éliminés</span></div><div class="feed">${kills.length ? kills.slice(0,4).map(k => `<div><b>${esc(k.symbol)}</b><span class="k x">${esc(k.detail)}</span></div>`).join("") : '<div class="x">aucune élimination</div>'}</div>`,
     analyst: `<div class="gauge"><svg viewBox="0 0 110 110"><circle cx="55" cy="55" r="44" fill="none" stroke="rgba(255,159,10,.18)" stroke-width="10"/><circle cx="55" cy="55" r="44" fill="none" stroke="${sc >= seuil() ? "#32D74B" : "#FF9F0A"}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - sc/100)}" transform="rotate(-90 55 55)" style="transition:stroke-dashoffset 1s"/><text x="55" y="58" text-anchor="middle" fill="#fff" font-size="28" font-weight="700">${top ? Math.round(sc) : "–"}</text><text x="55" y="76" text-anchor="middle" fill="#8E8E93" font-size="11">${esc(top ? top.symbol : "")}</text></svg>
       <div class="gt">${A.analyst.status === "running" ? "notation…" : "dernière notation"}<br>${S.scores ?? 0} notes · ${S.passes ?? 0} validés<br>seuil <b style="color:#fff">${seuil()}</b>${(D.config && D.config.analyst && D.config.analyst.signals) ? "<br>ou signal rapide" : ""}</div></div>`,
@@ -112,8 +121,8 @@ function agentCards() {
   const html = D.agents.map(a => `<div class="acard"><div class="ah"><div class="em">${AG[a.id]}</div><div><div class="an">${a.name}</div><div class="as">${subs[a.id]}</div></div>${stBadge(a)}</div>${cards[a.id]}</div>`).join("");
   const car = $("#carousel"), sl = car.scrollLeft; if (car._h !== html) { car._h = html; car.innerHTML = html; car.scrollLeft = sl; }
   if (!$("#cdots").children.length) $("#cdots").innerHTML = D.agents.map((_, i) => `<i class="${i ? "" : "on"}"></i>`).join("");
-  const n = D.agents.filter(a => a.ts && Date.now() - new Date(a.ts) < 5 * 60e3).length;
-  $("#nactifs").textContent = `${n} actifs`;
+  const n = activeCount(D.agents, Date.now());
+  $("#nactifs").textContent = n ? `${n} actifs` : "en attente";
 }
 $("#carousel").addEventListener("scroll", () => { const c = $("#carousel"), w = c.firstElementChild ? c.firstElementChild.offsetWidth + 12 : 1, i = Math.round(c.scrollLeft / w);
   [...$("#cdots").children].forEach((d, j) => d.classList.toggle("on", j === i)); }, {passive: true});
@@ -245,16 +254,34 @@ function renderIntensif() {
   const fd = I.feeds || {};
   $("#int-foot").innerHTML = `Papier uniquement · flux : Binance spot et perps (WebSocket), Kraken spot (WebSocket), Jupiter (~2 s) · bougies 15 s et 1 min · mise 0,75 % · stop ATR 0,3–1 %, objectif 1,5× le stop · sortie après 10 min · exposition max 20 % · pause à -3 % sur la journée ou après 6 pertes de suite · frais : Binance spot 0,10 %, perps 0,02 % maker / 0,05 % taker, Kraken 0,25 / 0,40 %, DEX 0,30 % + spread et latence · ordres limite remplis seulement si le prix traverse · messages reçus : ${Object.entries(fd).map(([k, v]) => k + " " + (v.msgs || 0).toLocaleString("fr-FR")).join(", ")} · mis à jour ${hhmm(I.ts)}`;
 }
+function renderAgentic() {
+  const box = $("#agentic-feed");
+  if (!box || !D || !D.agentic) return;
+  const A = D.agentic;
+  const lines = (A.feed || []).map(a => `<div class="feed-row"><div class="feed-who">${esc(a.agent)}</div><div class="feed-why">${esc(a.why || a.status || "en attente")}</div><div class="muted tiny">${esc(a.status || "")} ${a.ts ? "· " + hhmm(a.ts) : ""}</div></div>`).join("");
+  const learned = (A.learned || []).map(r => `<div class="li"><span>${esc(r.bucket)}</span><span>${esc(r.status || "")} · n=${r.n ?? 0}</span></div>`).join("");
+  const ai = A.ai || {};
+    const aiLine = `<div class="feed-row"><div class="feed-who">IA locale</div><div class="feed-why">${esc(ai.model || "aucun modèle choisi")}${ai.reachable ? "" : " · hors ligne"}</div></div>`;
+  box.innerHTML = lines + aiLine + (learned ? `<div class="sec-h"><h2>Ce que turbo a retenu</h2></div><div class="card">${learned}</div>` : "");
+}
 function renderTabs() { if (!D) return; const a = document.querySelector(".tab.active").id; if (a === "tab-intensif") renderIntensif();
-  if (a === "tab-agents") renderAgentsTab(); if (a === "tab-activity") renderActivityTab(); if (a === "tab-account") renderAccount();
-  if (a === "tab-orders" && window.renderOrders) window.renderOrders(); if (a === "tab-account" && window.renderSession) window.renderSession(); }
+  if (a === "tab-agents") renderAgentsTab(); if (a === "tab-activity") renderActivityTab(); if (a === "tab-agentic") renderAgentic(); if (a === "tab-account") renderAccount();
+  if (a === "tab-orders" && window.renderOrders) window.renderOrders();
+  if (a === "tab-account" && window.renderSession) window.renderSession();
+  if (a === "tab-account" && window.renderSettings) window.renderSettings(); }
 
 /* ---------- main loop ---------- */
+function showOffline(on) {
+  const b = $("#net-banner");
+  if (b) b.hidden = !on;
+}
 async function tick() {
+  if (polling || document.hidden) return;
+  polling = true;
   try {
-    const resp = await fetch("/api/all", {cache: "no-store"});
-    if (resp.status === 401) { location.href = "/login"; return; }
-    D = await resp.json();
+    const data = await getJSON("/api/all");
+    showOffline(false);
+    D = data;
     const meta = {}; D.activity.forEach(e => { if (e.icon) meta[e.mint] = e.icon; });
     D.positions.open.forEach(p => p.icon = meta[p.mint]);
     const S = D.summary; if (S.eurusd) FX = S.eurusd; if (S.bankroll) BANK = S.bankroll; if (S.bankroll_eur) BANK_EUR = S.bankroll_eur; setBalance(S.equity);
@@ -268,9 +295,24 @@ async function tick() {
     const sl = $("#seuil-lbl"); if (sl) sl.textContent = "seuil " + seuil();
     drawEquity(D.equity); agentCards(); renderActivity(); checkToasts(D.activity); renderTabs();
     $("#foot").innerHTML = `Mode papier · ${esc(profileLabel())} · capital virtuel ${fr2(BANK_EUR)} € (1 € = ${Number(FX).toLocaleString("fr-FR",{maximumFractionDigits:4})} $) · données DexScreener, RugCheck, GeckoTerminal<br>cycle ${S.cycle ?? 0} · mis à jour ${hhmm(S.ts)} (heure de Paris)`;
-  } catch (e) { console.error(e); }
+  } catch (e) {
+    if (e && e.status === 401) { location.href = "/login"; return; }
+    showOffline(true);
+  } finally {
+    polling = false;
+  }
 }
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
-tick(); setInterval(tick, 4000);
+function loop() { tick().finally(() => setTimeout(loop, 4000)); }
+loop();
+const eq = $("#eqchart");
+if (eq) {
+  const move = (ev) => { if (ev.cancelable) ev.preventDefault(); scrub(ev); };
+  eq.addEventListener("pointermove", scrub);
+  eq.addEventListener("pointerdown", scrub);
+  eq.addEventListener("pointerleave", () => { const tip = $("#chart-tip"); if (tip) tip.hidden = true; });
+  eq.addEventListener("touchmove", move, { passive: false });
+  if (window.ResizeObserver) new ResizeObserver(() => { if (D) drawEquity(D.equity); }).observe(eq.parentElement);
+}
 if (location.hash.slice(1)) go(location.hash.slice(1));
 const qm = new URLSearchParams(location.search).get("token"); if (qm) setTimeout(() => openToken(qm), 800);

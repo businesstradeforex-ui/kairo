@@ -264,7 +264,7 @@ def main(report=None):
 
     def about():
         window.create_confirmation_dialog("À propos de Kairo",
-            "Kairo 1.1.0\nDesk memecoins Solana.\nPaper trading par défaut. Le trading réel est éteint.")
+            "Kairo 1.2.0\nDesk memecoins Solana.\nPaper trading par défaut. Le trading réel est éteint.")
 
     def preferences():
         window.show()

@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.2.0 — 2026-11-11
+
+Écran revu (courbe, compteurs, modèle) et mode turbo, toujours en papier.
+
+- La courbe d'équité a des plages LIVE, 1H, 4H, 1J, 1S, TOUT. Un trou dans les points n'est plus un trait droit. Sur TOUT, le badge suit le même écart que l'en-tête (équité moins capital de départ).
+- L'état du desk est écrit dans le dossier du compte. Les compteurs Scout viennent de ce dossier, plus de zéros quand le journal montre des paires scannées.
+- Le modèle d'IA est celui du fichier partagé `model.txt`. Un compte peut le remplacer avec son propre fichier. L'écran affiche le modèle réellement lu.
+- Onglet Flux : dernière décision de chaque agent, et ce que le mode turbo a retenu.
+- Réinitialiser le compte papier archive la session (elle n'est pas effacée) puis repart à 100, 500, 1 000, 5 000, 10 000 € ou un montant libre.
+- Mode turbo : jusqu'à 10 positions, surveillance des sorties chaque seconde, frais de swap et frais de priorité dans le prix papier, taille selon le score, stops suiveurs et sortie de temps. Aucun trade n'est forcé.
+- Le turbo tient un journal des pertes et baisse ou bloque un type de setup après assez d'exemples. Les modes strict, agressif et profit gardent leurs règles d'origine.
+- Rejeu du fichier de labels `backtest_chart.json` (41 trades archivés, pas une bande de ticks) : agressif −3 986,60 $ (2 gains sur 41) ; turbo prend 21 trades et saute 20, pnl enregistré −2 574,70 $ (1 gain), −1 976,15 $ si l'on applique la taille réduite. Le seau bloqué est `chart_fail|liq_low`.
+
+Paper par défaut. Trading réel éteint.
+
 ## 1.1.0 — 2026-11-11
 
 Kairo.app est une application Mac, plus seulement un serveur qui ouvre Safari.

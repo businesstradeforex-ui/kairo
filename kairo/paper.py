@@ -42,8 +42,34 @@ def ensure_session(con):
 def open_count(con):
     return con.execute("SELECT COUNT(*) FROM positions WHERE status='open'").fetchone()[0]
 
+def archive_session(con):
+    """Copy the current book to data_dir/archives. The live tables are cleared after this returns."""
+    folder = os.path.join(common.data_dir(), "archives")
+    os.makedirs(folder, exist_ok=True)
+    stamp = common.now_iso().replace(":", "").replace("-", "")
+    path = os.path.join(folder, f"session-{stamp}.json")
+    positions = [dict(r) for r in con.execute("SELECT * FROM positions")]
+    exits = [dict(r) for r in con.execute("SELECT * FROM partial_exits")]
+    equity = [dict(r) for r in con.execute("SELECT * FROM equity")]
+    payload = {
+        "archived": common.now_iso(),
+        "bankroll_eur": common.kv_get(con, "bankroll_eur"),
+        "bankroll_usd": common.kv_get(con, "bankroll_usd"),
+        "cash": common.kv_get(con, "cash"),
+        "session": common.kv_get(con, "session"),
+        "positions": positions,
+        "partial_exits": exits,
+        "equity": equity,
+    }
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(payload, f, default=str)
+    os.replace(tmp, path)
+    return path
+
 def reset(con, eur):
     eur = clamp_eur(eur)
+    archive = archive_session(con)
     con.execute("DELETE FROM positions")
     con.execute("DELETE FROM partial_exits")
     con.execute("DELETE FROM equity")
@@ -61,7 +87,7 @@ def reset(con, eur):
             f.write(f"{eur}\n")
     except OSError:
         pass
-    return {"ok": True, "bankroll_eur": eur, "bankroll_usd": usd, "eurusd": fx}
+    return {"ok": True, "bankroll_eur": eur, "bankroll_usd": usd, "eurusd": fx, "archive": archive}
 
 def set_capital(con, eur):
     """Change the starting bankroll only when nothing is open. Otherwise ask for a reset."""

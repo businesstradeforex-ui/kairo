@@ -15,9 +15,15 @@ JUP_PATHS = ("toptrending/1h", "toptraded/1h", "toporganicscore/1h", "toptrendin
 
 def _collect_mints(cycle, S):
     mints = set()
-    for path in ["/token-profiles/latest/v1", "/token-boosts/latest/v1", "/token-boosts/top/v1",
-                 "/community-takeovers/latest/v1", "/ads/latest/v1"]:
-        d = get_json(DS + path)
+    paths = ["/token-profiles/latest/v1", "/token-boosts/latest/v1", "/token-boosts/top/v1",
+             "/community-takeovers/latest/v1", "/ads/latest/v1"]
+    if S.get("concurrent"):
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            payloads = list(pool.map(lambda p: get_json(DS + p), paths))
+    else:
+        payloads = [get_json(DS + p) for p in paths]
+    for d in payloads:
         for x in d or []:
             if isinstance(x, dict) and x.get("chainId") == "solana" and x.get("tokenAddress"):
                 mints.add(x["tokenAddress"])

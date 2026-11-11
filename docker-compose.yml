@@ -11,7 +11,7 @@
 # By default the desk looks for Ollama on the host (host.docker.internal:11434).
 services:
   kairo:
-    image: ghcr.io/businesstradeforex-ui/kairo:1.1.0
+    image: ghcr.io/businesstradeforex-ui/kairo:1.2.0
     build: .
     restart: unless-stopped
     env_file:

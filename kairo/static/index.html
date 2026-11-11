@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
+<div id="net-banner" class="net-banner" hidden>Connexion interrompue. Nouvel essai en cours.</div>
 <div id="toasts"></div>
 <div id="app">
   <!-- ACCUEIL -->
@@ -28,9 +29,9 @@
       <div class="lbl">Portefeuille</div>
       <div class="balance" id="balance"></div>
       <div class="delta-row"><span id="delta" class="delta"></span><span id="mult" class="pill-mult"></span></div>
-      <div class="chart-wrap"><svg id="eqchart" viewBox="0 0 400 190" preserveAspectRatio="none"></svg><div id="lastpill" class="lastpill"></div></div>
+      <div class="chart-wrap"><canvas id="eqchart"></canvas><div id="chart-tip" class="chart-tip" hidden></div><div id="lastpill" class="lastpill"></div></div>
       <div class="tf" id="tf">
-        <button data-tf="live" class="on live"><i></i>LIVE</button><button data-tf="1h">1H</button><button data-tf="4h">4H</button><button data-tf="1d">1J</button><button data-tf="1w">1S</button><button data-tf="all">TOUT</button>
+        <button data-tf="live" class="live"><i></i>LIVE</button><button data-tf="1h">1H</button><button data-tf="4h">4H</button><button data-tf="1d">1J</button><button data-tf="1w">1S</button><button data-tf="all" class="on">TOUT</button>
       </div>
     </div>
     <div class="sec-h"><h2>Agents</h2><span class="green" id="nactifs"></span></div>
@@ -39,6 +40,12 @@
     <div class="sec-h"><h2>Activité</h2><a class="green link" data-go="activity">Tout voir</a></div>
     <div class="list card" id="act-home"></div>
     <div class="foot-note" id="foot"></div>
+  </section>
+
+  <section class="tab" id="tab-agentic">
+    <header class="top"><h1>Flux agentique</h1><div class="badges"><div class="badge-paper">PAPIER</div><div class="badge-mode agressif">MODE AGRESSIF</div></div></header>
+    <p class="muted small">Ce que chaque agent vient de décider, et les setups que le mode turbo a appris à alléger.</p>
+    <div class="card" id="agentic-feed"></div>
   </section>
 
   <!-- AGENTS -->
@@ -116,6 +123,7 @@
 <nav class="bnav" id="bnav">
   <button data-tab="home" class="on"><span>⌂</span>Accueil</button>
   <button data-tab="agents"><span>◎</span>Agents</button>
+  <button data-tab="agentic"><span>◉</span>Flux</button>
   <button data-tab="activity"><span>≡</span>Activité</button>
   <button data-tab="intensif"><span>⚡</span>Intensif</button>
   <button data-tab="orders"><span>✦</span>Ordres</button>
@@ -123,7 +131,7 @@
 </nav>
 <script src="lightweight-charts.js"></script>
 <script src="i18n.js?v=kairo1"></script>
-<script src="app.js?v=kairo1"></script>
+<script type="module" src="app.js?v=kairo12"></script>
 <script src="ordres.js?v=kairo1"></script>
 <script src="settings.js?v=kairo1"></script>
 </body>
