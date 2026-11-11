@@ -206,6 +206,10 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, json.dumps(manifest()), "application/manifest+json")
             if path == "/api/auth/providers":
                 return self._json(200, webauth.providers())
+            if path == "/setup":
+                import ai_probe
+                report = ai_probe.load_report(common.BASE) or ai_probe.probe()
+                return self._send(200, ai_probe.setup_page(report), "text/html; charset=utf-8")
             if path in ("/login", "/signup"):
                 return self._html_page("login.html")
             if path == "/auth/google":
