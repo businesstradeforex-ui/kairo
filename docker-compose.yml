@@ -1,27 +1,37 @@
-# docker compose up -d --build
-# First account: docker compose run --rm kairo python manage.py create-user you --role owner
-# Model: docker compose exec ollama ollama pull qwen3:4b
-# Tunnel: put TUNNEL_TOKEN in .env then docker compose --profile tunnel up -d
+# Paper desk. Live trading stays off unless you set KAIRO_LIVE_ENABLED=1.
+#
+# Published image (after a release):
+#   docker compose pull && docker compose up -d
+# Build locally instead:
+#   docker compose up -d --build
+# With the bundled Ollama service:
+#   OLLAMA_URL=http://ollama:11434 docker compose --profile ai up -d
+# Then: docker compose exec ollama ollama pull qwen3:4b
+#
+# By default the desk looks for Ollama on the host (host.docker.internal:11434).
 services:
   kairo:
+    image: ghcr.io/businesstradeforex-ui/kairo:1.1.0
     build: .
     restart: unless-stopped
     env_file:
       - path: .env
         required: false
     environment:
-      OLLAMA_URL: http://ollama:11434
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
       KAIRO_LLM_MODEL: ${KAIRO_LLM_MODEL:-qwen3:4b}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:4b}
       MEMEDESK_UI_DIR: /data/ui
       KAIRO_LIVE_ENABLED: ${KAIRO_LIVE_ENABLED:-0}
+      KAIRO_NO_BROWSER: "1"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - kairo-data:/data
     ports:
       - "127.0.0.1:8787:8787"
-    depends_on:
-      - ollama
   ollama:
+    profiles: ["ai"]
     image: ollama/ollama:latest
     restart: unless-stopped
     volumes:
@@ -32,7 +42,7 @@ services:
     restart: unless-stopped
     command: tunnel --no-autoupdate run
     environment:
-      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN in .env}
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
     depends_on:
       - kairo
 volumes:

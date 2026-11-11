@@ -93,6 +93,10 @@ def supervise(name):
         log(f"{name} arrêté (code {p.returncode}) -> relance dans {backoff} s")
         _stop.wait(backoff)
 
+def shutdown():
+    """Ask the supervisor thread to stop its children. Used by the desktop app on Quit."""
+    _stop.set()
+
 def main(argv):
     which = argv[0] if argv else "all"
     names = list(COMPONENTS) if which == "all" else [which]
@@ -100,7 +104,8 @@ def main(argv):
         print(__doc__); return 1
     def _sig(*_):
         _stop.set()
-    signal.signal(signal.SIGTERM, _sig); signal.signal(signal.SIGINT, _sig)
+    if threading.current_thread() is threading.main_thread():
+        signal.signal(signal.SIGTERM, _sig); signal.signal(signal.SIGINT, _sig)
     log(f"superviseur ({', '.join(names)}) — données : {DATA}")
     ts = [threading.Thread(target=supervise, args=(n,), daemon=True) for n in names]
     for t in ts: t.start()

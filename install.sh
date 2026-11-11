@@ -1,17 +1,77 @@
 #!/usr/bin/env bash
-# Install Kairo (paper trading desk). macOS and Linux.
+# Install Kairo.
 #
-#   ./install.sh
-#   ./install.sh --model qwen3:4b
-#   ./install.sh --no-ollama
-#   ./install.sh --no-service
-#   ./install.sh --tunnel
+# One line (downloads the latest packaged build, no Python required):
+#   curl -fsSL https://raw.githubusercontent.com/businesstradeforex-ui/kairo/main/install.sh | bash
 #
-# Data directory: DATA_DIR (default ~/kairo-data). Port: DESK_PORT (8787).
-# No default password. No wallet. Live trading stays off.
+# From a git checkout, ./install.sh installs from source (venv + service).
+#   ./install.sh --release     packaged build even inside the checkout
+#   ./install.sh --model qwen3:4b --no-ollama --no-service --tunnel
+#
+# Paper trading. Live trading stays off. No default password.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")" && pwd)"
+release_install() {
+  command -v curl >/dev/null || { echo "curl est requis"; exit 1; }
+  local os arch suffix url tmp dest inner
+  os="$(uname -s)"; arch="$(uname -m)"
+  case "$os-$arch" in
+    Darwin-arm64) suffix="macos-arm64.zip" ;;
+    Darwin-x86_64) suffix="macos-intel.zip" ;;
+    Linux-x86_64|Linux-amd64) suffix="linux-x64.tar.gz" ;;
+    Linux-aarch64|Linux-arm64) suffix="linux-arm64.tar.gz" ;;
+    *) echo "Plateforme non prise en charge : $os $arch"; exit 1 ;;
+  esac
+  echo "Recherche de la dernière release ($suffix)…"
+  url="$(curl -fsSL "https://api.github.com/repos/businesstradeforex-ui/kairo/releases/latest" \
+    | python3 -c 'import json,sys; suf=sys.argv[1]; d=json.load(sys.stdin); print(next(a["browser_download_url"] for a in d.get("assets",[]) if a["name"].endswith(suf)))' "$suffix")"
+  tmp="$(mktemp -d)"
+  echo "Téléchargement de $url"
+  curl -fL "$url" -o "$tmp/pkg"
+  if [ "$os" = Darwin ]; then
+    mkdir -p "$tmp/out"
+    unzip -q "$tmp/pkg" -d "$tmp/out"
+    inner="$(find "$tmp/out" -name 'Kairo.app' -type d | head -1)"
+    [ -n "$inner" ] || { echo "Kairo.app introuvable dans l'archive"; exit 1; }
+    mkdir -p "$HOME/Applications"
+    rm -rf "$HOME/Applications/Kairo.app"
+    mv "$inner" "$HOME/Applications/Kairo.app"
+    echo "Installé : $HOME/Applications/Kairo.app"
+    echo "Première ouverture : clic droit > Ouvrir (app non signée, Gatekeeper)."
+    open "$HOME/Applications/Kairo.app" || true
+  else
+    mkdir -p "$tmp/out"
+    tar -xzf "$tmp/pkg" -C "$tmp/out"
+    inner="$(find "$tmp/out" -type f -path '*/bin/kairo' | head -1)"
+    [ -n "$inner" ] || { echo "bin/kairo introuvable"; exit 1; }
+    dest="${KAIRO_INSTALL_DIR:-$HOME/.local/opt/kairo}"
+    rm -rf "$dest"
+    mkdir -p "$(dirname "$dest")"
+    mv "$(dirname "$(dirname "$inner")")" "$dest"
+    mkdir -p "$HOME/.local/bin"
+    ln -sfn "$dest/bin/kairo" "$HOME/.local/bin/kairo"
+    echo "Installé : $dest"
+    echo "Lancez : $HOME/.local/bin/kairo   (ajoutez ~/.local/bin au PATH si besoin)"
+    "$dest/bin/kairo" || true
+  fi
+  rm -rf "$tmp"
+}
+
+IN_REPO=0
+if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
+  ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  [ -f "$ROOT/kairo/server.py" ] && IN_REPO=1
+fi
+FORCE_RELEASE=0
+for _a in "$@"; do [ "$_a" = "--release" ] && FORCE_RELEASE=1; done
+if [ "$IN_REPO" = 0 ] || [ "$FORCE_RELEASE" = 1 ]; then
+  release_install
+  exit 0
+fi
+# Drop --release so the source installer does not treat it as unknown.
+args=()
+for _a in "$@"; do [ "$_a" = "--release" ] || args+=("$_a"); done
+set -- "${args[@]}"
 APP="$ROOT/kairo"
 DATA="${DATA_DIR:-$HOME/kairo-data}"
 PORT="${DESK_PORT:-8787}"

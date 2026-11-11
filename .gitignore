@@ -8,6 +8,8 @@ __pycache__/
 *.pyo
 .pytest_cache/
 .ruff_cache/
+dist/
+packaging/cache/
 *.db
 *.db-*
 *.db-journal

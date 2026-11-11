@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Préférences · Kairo</title>
+<link rel="stylesheet" href="/login.css">
+<style>body{align-items:start;padding:28px 16px}.box{max-width:440px} label{display:flex;gap:10px;align-items:center;color:#fff;margin:12px 0}</style>
+</head>
+<body>
+<div class="box">
+  <div class="brand"><img src="/logo.svg" alt=""><div><div class="t1">Préférences</div><div class="t2">Kairo</div></div></div>
+  <form class="card" id="f">
+    <label><input type="checkbox" id="background"> Continuer en arrière-plan quand la fenêtre se ferme</label>
+    <label><input type="checkbox" id="login"> Ouvrir Kairo à l'ouverture de session</label>
+    <label><input type="checkbox" id="notes"> Notifications des trades clôturés</label>
+    <button class="primary" type="submit">Enregistrer</button>
+    <p class="note" id="msg"></p>
+  </form>
+  <p class="note"><a href="/" style="color:#32D74B">Retour au desk</a></p>
+</div>
+<script src="/app-settings.js"></script>
+</body>
+</html>
