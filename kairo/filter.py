@@ -4,7 +4,7 @@ Strict profile: fail-closed. Agressif: hard kills only for mint/freeze + liquidi
 other checks become score penalties. Missing data is a penalty except mint/freeze (fail-closed or defer if budget)."""
 import time
 from common import get_json, jsonl, now_iso
-from config import cfg
+from config import cfg, profile_name
 
 RC = "https://api.rugcheck.xyz/v1/tokens"
 RPC = "https://api.mainnet-beta.solana.com"
@@ -244,6 +244,11 @@ def run(cycle, candidates):
     for c in ordered:
         kills, pens = [], []
         v1 = float(c["vol"].get("h1") or 0); ch1 = float(c["chg"].get("h1") or 0)
+        if profile_name() == "turbo":
+            from quality import turbo_block
+            reason = turbo_block(c)
+            if reason:
+                _kill(kills, reason, None, "turbo")
         if c["liq"] < F["liq_min"]:
             _kill(kills, "liquidity_too_low", round(c["liq"]), f"<{F['liq_min']}")
         if v1 < F["vol1h_kill"]:

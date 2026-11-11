@@ -1,14 +1,20 @@
 """Stage 4 - EXECUTOR (PAPER). Input: Analyst passes. Output: filled paper orders (each carries its stop).
 Virtual bankroll $10,000. Max 8% of equity per trade. PAPER ONLY — no wallets, no keys, no real orders.
 Fill = DexScreener priceUsd * (1 + slippage), slippage from constant-product price impact on liquidity."""
-import datetime, time
-from common import jsonl, now_iso, kv_get, kv_set
+import datetime, os, time
+from common import jsonl, now_iso, kv_get, kv_set, data_dir
 from config import cfg, profile_name
 import risk, learn
 
 BANKROLL = 10_000.0  # legacy default only; sessions store bankroll_usd/cash in kv (1000 EUR session)
 FEE = 0.0025  # assumed swap fee
 MAX_FRAC = 0.08  # hard cap, never exceeded
+
+def _turbo_stats_path():
+    return os.path.join(data_dir(), "turbo_learner.json")
+
+def _turbo_journal_path():
+    return os.path.join(data_dir(), "journal_turbo.jsonl")
 
 def slippage(size_usd, liq_usd):
     quote_side = max(liq_usd / 2.0, 1.0)  # ~half of pool liquidity sits on the quote side
@@ -108,6 +114,24 @@ def learn_refresh(con):
                                      "pnl_usd": r["tot"], "hold_s": hold, "peak_pct": (r["peak_price"] / r["entry_price"] - 1) * 100 if r["entry_price"] else None,
                                      "entry_ts": r["entry_ts"], "exit_ts": r["exit_ts"]})
             done.add(r["id"])
+    if profile_name() == "turbo":
+        import learner as bayes
+        seen = set(kv_get(con, "turbo_learned", []) or [])
+        stats = bayes.load(_turbo_stats_path())
+        changed = False
+        for r in rows:
+            if r["id"] in seen:
+                continue
+            feat = {"setup": r["entry_trigger"] or "score", "liq": r["liq"], "symbol": r["symbol"],
+                    "pnl_usd": r["tot"], "exit_reason": r["exit_reason"], "id": r["id"]}
+            bayes.update(stats, bayes.bucket(feat), r["tot"] > 0)
+            if r["tot"] < 0:
+                bayes.journal_loss(_turbo_journal_path(), feat)
+            seen.add(r["id"])
+            changed = True
+        if changed:
+            bayes.save(_turbo_stats_path(), stats)
+            kv_set(con, "turbo_learned", sorted(seen))
     kv_set(con, "journaled", sorted(done))
     return learn.refresh(con, trades, now_iso())
 
@@ -147,11 +171,30 @@ def run(cycle, con, passes):
             continue
         eq, _ = equity(con)
         frac = size_frac(c, E) * mult
+        priority = 0.0
+        turbo_key = None
+        if profile_name() == "turbo":
+            import learner as bayes
+            stats = bayes.load(_turbo_stats_path())
+            bmult, turbo_key, _bstatus = bayes.multiplier(stats, {"setup": trig0, "liq": c.get("liq")})
+            if bmult <= 0:
+                jsonl("executor", {"cycle": cycle, "mint": c["mint"], "symbol": c["symbol"], "action": "skip_turbo_bucket", "bucket": turbo_key})
+                continue
+            frac *= bmult
         size = min(frac * eq, cash(con))
         if size < min_size or c["price"] <= 0:
             jsonl("executor", {"cycle": cycle, "mint": c["mint"], "symbol": c["symbol"], "action": "skip_no_cash"})
             continue
-        slip = slippage(size, c["liq"])
+        if profile_name() == "turbo":
+            from fills import paper_buy
+            quote = paper_buy(c["price"], size, c["liq"])
+            slip = quote["slip"]
+            priority = quote["priority_fee_usd"]
+            if cash(con) < size + priority:
+                jsonl("executor", {"cycle": cycle, "mint": c["mint"], "symbol": c["symbol"], "action": "skip_no_cash"})
+                continue
+        else:
+            slip = slippage(size, c["liq"])
         if max_slip is not None and slip > max_slip:
             # size down to liquidity so slip <= max_slip, otherwise skip
             # slip = size/(liq/2) + FEE  => size = (max_slip - FEE) * liq/2
@@ -166,7 +209,13 @@ def run(cycle, con, passes):
                 jsonl("executor", {"cycle": cycle, "mint": c["mint"], "symbol": c["symbol"], "action": "skip_slippage",
                                    "slip": slip, "max_slip": max_slip, "liq": c["liq"]})
                 continue
-        fill = c["price"] * (1 + slip)
+        if profile_name() == "turbo":
+            quote = paper_buy(c["price"], size, c["liq"])
+            slip = quote["slip"]
+            fill = quote["fill_price"]
+            priority = quote["priority_fee_usd"]
+        else:
+            fill = c["price"] * (1 + slip)
         triggers = c.get("triggers") or ["score"]
         trigger = ",".join(triggers)
         order = {"mint": c["mint"], "pair": c["pair"], "symbol": c["symbol"], "ref_price": c["price"], "fill_price": fill,
@@ -180,7 +229,7 @@ def run(cycle, con, passes):
                     (c["mint"], c["pair"], c["symbol"], "open", now_iso(), fill, c["price"], order["qty"], size, slip,
                      order["stop_price"], order["stop_price"], 0, fill, c["price"], c["liq"], c["score"], trigger,
                      profile_name(), 0, order["qty"]))
-        kv_set(con, "cash", cash(con) - size)
+        kv_set(con, "cash", cash(con) - size - priority)
         order["position_id"] = cur.lastrowid
         fills.append(order)
         n_open += 1

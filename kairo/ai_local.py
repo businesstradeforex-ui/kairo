@@ -33,6 +33,40 @@ LLM_MIN_INTERVAL_S = float(os.environ.get("KAIRO_LLM_MIN_INTERVAL_S", "2"))
 _llm_lock = __import__("threading").Lock()
 _llm_next = [0.0]
 
+def _model_listed(name, models):
+    name = (name or "").strip()
+    if not name:
+        return False
+    for raw in models or []:
+        m = (raw or "").strip()
+        if m == name or m.startswith(name + "-") or m.startswith(name + ":"):
+            return True
+    return False
+
+def _model_file(path):
+    try:
+        name = open(path, encoding="utf-8").read().strip()
+        return name or None
+    except OSError:
+        return None
+
+def current_model():
+    """Global model.txt in the data root, unless this account has its own override.
+
+    Onboarding writes the shared file. A per-user model.txt is optional and wins
+    only when the account directory is not the root.
+    """
+    root = os.path.abspath(common.BASE)
+    user = os.path.abspath(common.data_dir())
+    if user != root:
+        override = _model_file(os.path.join(user, "model.txt"))
+        if override:
+            return override
+    shared = _model_file(os.path.join(root, "model.txt"))
+    if shared:
+        return shared
+    return MODEL
+
 def pause_flag():
     return os.path.join(common.data_dir(), "paused.flag")
 
@@ -48,7 +82,7 @@ def _backend():
     if LLM_BACKEND == "ollama":
         return "ollama"
     return "openai" if OPENAI_BASE_URL else "ollama"
-PROFILES = ("strict", "agressif", "profit")
+PROFILES = ("strict", "agressif", "profit", "turbo")
 ACTIONS = ("set_profile", "set_intensif", "set_param", "reset_params", "pause_desk", "resume_desk", "summary")
 PCT_PARAMS = {"stop_pct", "trail_pct", "trail_activate", "max_frac"}
 PARAM_FR = {"liq_min": "liquidité minimale ($)", "max_open": "positions ouvertes max", "stop_pct": "stop-loss",
@@ -100,7 +134,7 @@ def validate(a):
         if p == "intensif":
             return {"action": "set_intensif", "enabled": True}
         if p not in PROFILES:
-            raise Refused(f"profil inconnu : {p!r} (strict, agressif, profit)")
+            raise Refused(f"profil inconnu : {p!r} (strict, agressif, profit, turbo)")
         return {"action": act, "profile": p}
     if act == "set_intensif":
         en = a.get("enabled")
@@ -186,7 +220,7 @@ def llm(messages, as_json=True, max_tokens=200):
     """Call the configured local model. Temperature 0. Never executes the reply — callers validate it."""
     _rate_limit_llm()
     if _backend() == "openai":
-        body = {"model": MODEL, "messages": messages, "temperature": 0, "max_tokens": max_tokens}
+        body = {"model": current_model(), "messages": messages, "temperature": 0, "max_tokens": max_tokens}
         if as_json:
             body["response_format"] = {"type": "json_object"}
         headers = {"Content-Type": "application/json"}
@@ -196,7 +230,7 @@ def llm(messages, as_json=True, max_tokens=200):
         with urllib.request.urlopen(req, timeout=LLM_TIMEOUT_S) as r:
             data = json.load(r)
         return data["choices"][0]["message"]["content"]
-    body = {"model": MODEL, "messages": messages, "stream": False,
+    body = {"model": current_model(), "messages": messages, "stream": False,
             "options": {"temperature": 0, "num_predict": max_tokens}}
     if as_json:
         body["format"] = "json"
@@ -275,7 +309,7 @@ def parse_order(raw):
         raise Refused("refusé par l'IA locale : " + str(a.get("reason") or "hors liste blanche")[:200])
     if isinstance(a, dict) and a.get("action") in ACTIONS and not plausible(a, s):
         raise Refused(f"ordre ambigu (l'IA locale proposait « {a.get('action')} »), reformulez plus précisément")
-        return a, f"{_backend()}:{MODEL}"
+        return a, f"{_backend()}:{current_model()}"
 
 # ---------- exécution ----------
 def _write_atomic(path, text):
@@ -407,7 +441,7 @@ def status():
     models = a_models if backend == "openai" else o_models
     return {"ollama": o_up, "openai": a_up, "backend": backend, "online": up,
             "ollama_url": OLLAMA_URL, "openai_base_url": OPENAI_BASE_URL or None,
-            "model": MODEL, "model_present": any((m or "").split(":")[0].startswith(MODEL.split(":")[0]) or (m or "") == MODEL for m in models),
+            "model": current_model(), "model_present": _model_listed(current_model(), models),
             "models": models, "profile": config.profile_name(), "overrides": config.overrides(),
             "desk_paused": os.path.exists(pause_flag()), "intensif_enabled": not os.path.exists(intensif_off_flag()),
             "actions": list(ACTIONS), "bounds": {k: [v[2], v[3]] for k, v in config.OVERRIDABLE.items()},

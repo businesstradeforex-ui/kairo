@@ -7,7 +7,13 @@ ENV PYTHONUNBUFFERED=1 \
     DESK_PORT=8787 \
     TRUST_PROXY=1 \
     KAIRO_ENV=production \
-    KAIRO_MULTIUSER=1
+    KAIRO_MULTIUSER=1 \
+    KAIRO_LIVE_ENABLED=0 \
+    KAIRO_NO_BROWSER=1
+
+LABEL org.opencontainers.image.source="https://github.com/businesstradeforex-ui/kairo" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.title="Kairo"
 
 WORKDIR /app
 COPY requirements.txt .

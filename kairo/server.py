@@ -109,6 +109,9 @@ class H(BaseHTTPRequestHandler):
             return json.loads(raw or "{}")
         return {k: v[0] for k, v in parse_qs(raw).items()}
 
+    def _loopback(self):
+        return self.client_address[0] in ("127.0.0.1", "::1")
+
     def _secure(self):
         return _secure_request(self)
 
@@ -206,6 +209,22 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, json.dumps(manifest()), "application/manifest+json")
             if path == "/api/auth/providers":
                 return self._json(200, webauth.providers())
+            if path == "/setup":
+                import ai_probe
+                report = ai_probe.load_report(common.BASE) or ai_probe.probe()
+                return self._send(200, ai_probe.setup_page(report), "text/html; charset=utf-8")
+            if path in ("/onboarding", "/app-settings"):
+                if not self._loopback():
+                    return self._json(403, {"error": "local uniquement"})
+                extra = {}
+                c = self._ensure_csrf_cookie()
+                if c:
+                    extra["Set-Cookie"] = c
+                name = "onboarding.html" if path == "/onboarding" else "app-settings.html"
+                with open(os.path.join(dashdata.static_dir(), name), encoding="utf-8") as f:
+                    return self._send(200, f.read(), "text/html; charset=utf-8", extra)
+            if path.startswith("/api/local/"):
+                return self._local_get(path)
             if path in ("/login", "/signup"):
                 return self._html_page("login.html")
             if path == "/auth/google":
@@ -334,6 +353,49 @@ class H(BaseHTTPRequestHandler):
             return self._json(200, {"tokens": webauth.list_agent_tokens()})
         return self._json(404, {"error": "inconnu"})
 
+    def _local_get(self, path):
+        if not self._loopback():
+            return self._json(403, {"error": "local uniquement"})
+        import desktop_prefs, localsetup
+        if path == "/api/local/status":
+            return self._json(200, localsetup.status())
+        if path == "/api/local/pull":
+            return self._json(200, localsetup.pull_snapshot())
+        if path == "/api/local/prefs":
+            return self._json(200, desktop_prefs.load(common.BASE))
+        return self._json(404, {"error": "inconnu"})
+
+    def _local_post(self, path, data):
+        if not self._loopback():
+            return self._json(403, {"error": "local uniquement"})
+        user = self._user()
+        if not (self._csrf_ok(None, data) or (user and self._csrf_ok(user, data))):
+            return self._json(403, {"error": "csrf"})
+        import desktop_prefs, localsetup
+        try:
+            if path == "/api/local/pull":
+                return self._json(200, localsetup.start_pull(data.get("model")))
+            if path == "/api/local/use":
+                out = localsetup.use_model(data.get("model"))
+                prefs = desktop_prefs.load(common.BASE)
+                prefs["onboarding_done"] = True
+                desktop_prefs.save(common.BASE, prefs)
+                return self._json(200, out)
+            if path == "/api/local/test":
+                return self._json(200, localsetup.test_model(data.get("model")))
+            if path == "/api/local/prefs":
+                prefs = desktop_prefs.load(common.BASE)
+                for key in ("background", "launch_at_login", "notifications", "onboarding_done"):
+                    if key in data:
+                        prefs[key] = bool(data[key])
+                desktop_prefs.save(common.BASE, prefs)
+                if "launch_at_login" in data:
+                    desktop_prefs.apply_login(bool(data["launch_at_login"]))
+                return self._json(200, {"ok": True, "prefs": prefs})
+        except ValueError as exc:
+            return self._json(400, {"error": str(exc)})
+        return self._json(404, {"error": "inconnu"})
+
     # ----- POST -----
     def do_POST(self):
         u = urlparse(self.path)
@@ -346,6 +408,8 @@ class H(BaseHTTPRequestHandler):
             if self._rate("post", 180, 60):
                 return
             data = self._data()
+            if path.startswith("/api/local/"):
+                return self._local_post(path, data)
             if path in ("/login", "/signup", "/auth/magic", "/auth/siws/nonce", "/auth/siws/verify", "/login/totp"):
                 if not self._origin_ok() or not self._csrf_ok(None, data):
                     # login page sets the csrf cookie; require it

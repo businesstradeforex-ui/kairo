@@ -1,7 +1,7 @@
 """Stage 6 - LOGGER. Input: outputs of all prior stages for a cycle. Persists kills, scores (already in db by Analyst),
 entries/exits, equity curve, per-agent status; writes state.json consumed by the dashboard."""
 import json, os
-from common import jsonl, now_iso, kv_get, kv_set, BASE, eurusd, bankroll_usd
+from common import jsonl, now_iso, kv_get, kv_set, data_dir, eurusd, bankroll_usd
 
 AGENTS = ["scout", "filter", "analyst", "executor", "risk", "logger"]
 
@@ -55,7 +55,8 @@ def write_state(con):
     st["closed"] = [dict(r) for r in con.execute("SELECT * FROM positions WHERE status='closed' ORDER BY id DESC LIMIT 30")]
     st["equity_curve"] = [dict(r) for r in con.execute("SELECT ts, equity FROM (SELECT rowid, ts, equity FROM equity ORDER BY rowid DESC LIMIT 1500) ORDER BY rowid")]
     st["cycles"] = [dict(r) for r in con.execute("SELECT * FROM cycles ORDER BY id DESC LIMIT 15")]
-    tmp = os.path.join(BASE, "state.json.tmp")
+    folder = data_dir()
+    tmp = os.path.join(folder, "state.json.tmp")
     with open(tmp, "w") as f:
         json.dump(st, f, default=str)
-    os.replace(tmp, os.path.join(BASE, "state.json"))
+    os.replace(tmp, os.path.join(folder, "state.json"))

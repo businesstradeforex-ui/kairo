@@ -36,6 +36,10 @@ def _key_bytes():
         return key
     return open(path, "rb").read().strip()
 
+def ensure_key():
+    """Create the on-disk key if KAIRO_SECRET_KEY is unset. Safe to call on first launch."""
+    return _key_bytes()
+
 def fernet():
     return Fernet(_key_bytes())
 

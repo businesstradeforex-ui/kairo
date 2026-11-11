@@ -57,6 +57,7 @@ def reset_session():
     _S.headers["User-Agent"] = "memedesk-paper/1.0 (read-only research)"
 
 _last_call = {}
+_gap_lock = threading.Lock()
 _MIN_GAP = {"api.dexscreener.com": 0.25, "api.rugcheck.xyz": 1.1, "api.mainnet-beta.solana.com": 0.6, "api.geckoterminal.com": 6.5, "lite-api.jup.ag": 1.0}
 STATS = {"http_ok": 0, "http_err": 0, "http_429": 0}
 _resp_cache = {}  # key -> (epoch, data)
@@ -79,10 +80,11 @@ def get_json(url, params=None, timeout=(5, 10), tries=2, method="GET", body=None
             return hit[1]
     for attempt in range(tries):
         gap = _MIN_GAP.get(host, 0.3)
-        dt = time.time() - _last_call.get(host, 0)
-        if dt < gap:
-            time.sleep(gap - dt)
-        _last_call[host] = time.time()
+        with _gap_lock:
+            dt = time.time() - _last_call.get(host, 0)
+            if dt < gap:
+                time.sleep(gap - dt)
+            _last_call[host] = time.time()
         try:
             if method == "POST":
                 r = _S.post(url, json=body, timeout=timeout)

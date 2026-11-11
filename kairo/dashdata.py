@@ -148,8 +148,15 @@ def summary():
 
 def agents():
     roles = _agent_fr()
-    s = state().get("agents") or {}
+    s = dict(state().get("agents") or {})
     order = ["scout", "filter", "analyst", "executor", "risk", "logger"]
+    # state.json used to be written next to the shared data root while the book lives in
+    # users/<id>/. The kv rows are in the account database, so they stay the source of truth.
+    if not any((s.get(a) or {}).get("ts") for a in order):
+        for a in order:
+            row = _kv(f"agent_{a}")
+            if isinstance(row, dict) and row:
+                s[a] = row
     return [{"id": a, "name": a.capitalize(), "role_fr": roles[a], **(s.get(a) or {}),
              "status_fr": STATUS_FR.get((s.get(a) or {}).get("status"), "—"),
              "handoff_to": order[i + 1] if i + 1 < len(order) else None} for i, a in enumerate(order)]
@@ -382,6 +389,37 @@ def intensif():
     except Exception:
         return {}
 
+def agentic():
+    """What each agent last decided, plus what the turbo learner has kept."""
+    feed = []
+    for row in agents():
+        feed.append({
+            "agent": row.get("name") or row.get("id"),
+            "role": row.get("role_fr") or "",
+            "status": row.get("status_fr") or row.get("status") or "",
+            "why": row.get("last_action") or "",
+            "ts": row.get("ts"),
+            "counters": row.get("counters") or {},
+        })
+    lessons_rows = []
+    try:
+        import learner
+        stats = learner.load(os.path.join(_base(), "turbo_learner.json"))
+        for key, row in stats.items():
+            if not isinstance(row, dict):
+                continue
+            lessons_rows.append({"bucket": key, "n": row.get("n"), "p": row.get("p"), "status": row.get("status")})
+    except Exception:
+        lessons_rows = []
+    ai = {}
+    try:
+        import ai_local
+        st = ai_local.status()
+        ai = {"model": st.get("selected"), "running": st.get("running"), "reachable": st.get("reachable")}
+    except Exception:
+        ai = {}
+    return {"feed": feed, "learned": lessons_rows[:12], "ai": ai}
+
 def lessons():
     import learn
     try:
@@ -392,7 +430,7 @@ def lessons():
     except Exception as e:
         return {"profit": [], "error": str(e)}
 
-ROUTES = {"/api/intensif": intensif, "/api/lessons": lessons, "/api/activity": activity, "/api/scout_feed": scout_feed, "/api/config": config, "/api/summary": summary, "/api/agents": agents, "/api/handoffs": handoffs, "/api/kills": kills,
+ROUTES = {"/api/intensif": intensif, "/api/lessons": lessons, "/api/agentic": agentic, "/api/activity": activity, "/api/scout_feed": scout_feed, "/api/config": config, "/api/summary": summary, "/api/agents": agents, "/api/handoffs": handoffs, "/api/kills": kills,
           "/api/kills_by_reason": kills_by_reason, "/api/scores": scores, "/api/positions": positions,
           "/api/equity": equity_curve, "/api/cycles": cycles, "/api/labels": labels}
 

@@ -71,9 +71,15 @@
       <form method="post" action="/logout"><input type="hidden" name="csrf" value="${esc(csrf)}"><button class="btn-out" type="submit">Se déconnecter</button></form>`;
     const b = $("#session-box"); if (b._h !== h) { b._h = h; b.innerHTML = h; }
   }
-  $("#order-form").addEventListener("submit", e => { e.preventDefault(); send($("#order-input").value); });
-  $("#order-chips").addEventListener("click", e => { const b = e.target.closest("button"); if (b) send(b.textContent); });
-  window.renderOrders = renderOrders;
-  window.renderSession = () => { if (ME) renderSession(); else me().then(renderSession); };
-  me();
+  function boot() {
+    if (typeof $ !== "function") { setTimeout(boot, 30); return; }
+    const form = $("#order-form");
+    if (!form) return;
+    form.addEventListener("submit", e => { e.preventDefault(); send($("#order-input").value); });
+    $("#order-chips").addEventListener("click", e => { const b = e.target.closest("button"); if (b) send(b.textContent); });
+    window.renderOrders = renderOrders;
+    window.renderSession = () => { if (ME) renderSession(); else me().then(renderSession); };
+    me();
+  }
+  boot();
 })();

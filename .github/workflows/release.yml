@@ -1,0 +1,230 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version without v, for a manual build (example 1.0.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  KAIRO_PYTHON_RELEASE: "20261003"
+  KAIRO_CPYTHON: "3.12.15"
+
+jobs:
+  packages:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x64
+            os: ubuntu-24.04
+            formats: tar,deb
+            appimage: "x86_64"
+          - target: linux-arm64
+            os: ubuntu-24.04-arm
+            formats: tar,deb
+            appimage: "aarch64"
+          - target: macos-arm64
+            os: macos-15
+            formats: zip
+            appimage: ""
+          - target: macos-intel
+            os: macos-15-intel
+            formats: zip
+            appimage: ""
+          - target: windows-x64
+            os: windows-2022
+            formats: zip
+            appimage: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Version
+        id: ver
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Linux packages
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev
+          python3 packaging/build.py --target "${{ matrix.target }}" --version "${{ steps.ver.outputs.version }}" --formats "${{ matrix.formats }}"
+      - name: AppImage
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ver="${{ steps.ver.outputs.version }}"
+          target="${{ matrix.target }}"
+          stage=$(find dist/tree -maxdepth 1 -type d -name "Kairo-*" | head -1)
+          tool="appimagetool-${{ matrix.appimage }}.AppImage"
+          curl -fsSL -o "/tmp/$tool" "https://github.com/AppImage/appimagetool/releases/download/continuous/$tool"
+          chmod +x "/tmp/$tool"
+          bash packaging/appimage.sh "$stage" "dist/Kairo-${ver}-${target}.AppImage" "/tmp/$tool"
+      - name: macOS app and dmg
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ver="${{ steps.ver.outputs.version }}"
+          target="${{ matrix.target }}"
+          python3 packaging/build.py --target "$target" --version "$ver" --formats zip
+          stage=$(find dist/tree -maxdepth 1 -type d -name "Kairo-*" | head -1)
+          codesign --force --deep --sign - "$stage/Kairo.app"
+          codesign --verify --verbose=2 "$stage/Kairo.app"
+          hdiutil create -volname Kairo -srcfolder "$stage/Kairo.app" -ov -format UDZO "dist/Kairo-${ver}-${target}.dmg"
+      - name: Windows zip
+        if: runner.os == 'Windows'
+        shell: bash
+        run: python3 packaging/build.py --target windows-x64 --version "${{ steps.ver.outputs.version }}" --formats zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: dist/Kairo-*
+          if-no-files-found: error
+
+  manifests:
+    needs: packages
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: "linux-*"
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: "macos-*"
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: "windows-*"
+          merge-multiple: true
+      - name: Checksums and package manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then ver="${{ inputs.version }}"; else ver="${GITHUB_REF_NAME#v}"; fi
+          mkdir -p dist/flat
+          find dist -type f -name 'Kairo-*' -exec cp {} dist/flat/ \;
+          cd dist/flat
+          sha256sum Kairo-* | tee SHA256SUMS
+          python3 "$GITHUB_WORKSPACE/packaging/manifests.py" --version "$ver" --dist .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: manifests
+          path: |
+            dist/flat/SHA256SUMS
+            dist/flat/kairo.rb
+            dist/flat/kairo.json
+            dist/flat/winget/**
+
+  docker:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version
+        id: ver
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/businesstradeforex-ui/kairo:${{ steps.ver.outputs.version }}
+            ghcr.io/businesstradeforex-ui/kairo:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/businesstradeforex-ui/kairo
+            org.opencontainers.image.licenses=MIT
+      - name: Try to mark the image public
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api --method PUT /user/packages/container/kairo/visibility -f visibility=public \
+            || gh api --method PUT "/orgs/${{ github.repository_owner }}/packages/container/kairo/visibility" -f visibility=public
+
+  github-release:
+    needs: [packages, manifests, docker]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: all
+          pattern: "linux-*"
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          path: all
+          pattern: "macos-*"
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          path: all
+          pattern: "windows-*"
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          path: all
+          pattern: manifests
+          merge-multiple: true
+      - name: Release notes
+        id: notes
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then ver="${{ inputs.version }}"; else ver="${GITHUB_REF_NAME#v}"; fi
+          if [ -f "docs/release-notes/v${ver}.md" ]; then cp "docs/release-notes/v${ver}.md" notes.md
+          else printf 'Kairo %s\n\nPaper trading by default. Live trading off.\n' "$ver" > notes.md; fi
+      - name: Collect files
+        shell: bash
+        run: |
+          mkdir -p release
+          find all -type f \( -name 'Kairo-*' -o -name 'SHA256SUMS' -o -name 'kairo.rb' -o -name 'kairo.json' -o -name '*.yaml' \) -exec cp {} release/ \;
+          find release -type f -print
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
+          name: Kairo ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+          body_path: notes.md
+          files: release/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

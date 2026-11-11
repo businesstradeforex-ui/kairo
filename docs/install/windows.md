@@ -1,8 +1,16 @@
 # Installer Kairo sur Windows
 
-Deux chemins : Python natif, ou WSL / Docker. Le paper trading est le même.
+## Zip portable (recommandé)
 
-## Natif
+Pas besoin de Python. PowerShell :
+
+```powershell
+irm https://raw.githubusercontent.com/businesstradeforex-ui/kairo/main/install.ps1 | iex
+```
+
+Le zip `Kairo-<version>-windows-x64.zip` se range dans `%LOCALAPPDATA%\Programs\Kairo`. Double-clic sur `Kairo.cmd`. Les données et la clé sont dans `%LOCALAPPDATA%\Kairo`. Le navigateur s'ouvre. S'il n'y a pas d'Ollama, de LM Studio ou de llama.cpp, la page `/setup` dit quoi lancer. Le trading réel reste éteint.
+
+## Python natif (depuis les sources)
 
 1. Installez Python 3.10+ depuis python.org et cochez **Add python.exe to PATH**.
 2. Dans PowerShell, à la racine du dépôt :

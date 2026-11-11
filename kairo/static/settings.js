@@ -20,8 +20,15 @@ async function renderSettings(force) {
     <div class="card">
       <label class="muted small">Capital de départ (€)</label>
       <input id="paper-eur" value="${esc(u.paper_eur || 1000)}" inputmode="decimal" style="width:100%;margin:8px 0;background:#2C2C2E;border:0;border-radius:12px;color:#fff;padding:12px;font-size:16px">
+      <div class="presets" id="paper-presets">
+        <button type="button" data-eur="100">100 €</button>
+        <button type="button" data-eur="500">500 €</button>
+        <button type="button" data-eur="1000">1 000 €</button>
+        <button type="button" data-eur="5000">5 000 €</button>
+        <button type="button" data-eur="10000">10 000 €</button>
+      </div>
       <button class="btn-out" id="paper-save" style="color:#32D74B" type="button">Enregistrer le capital</button>
-      <button class="btn-out" id="paper-reset" type="button">Remettre à zéro…</button>
+      <button class="btn-out" id="paper-reset" type="button">Réinitialiser le compte papier</button>
     </div>
     <h3>Comptes connectés</h3>
     <div class="card">${linked || '<div class="empty">Aucun compte relié</div>'}
@@ -47,9 +54,11 @@ async function renderSettings(force) {
   box.dataset.ready = "1";
   const refresh = () => { box.dataset.ready = ""; renderSettings(true); };
   $("#paper-save").onclick = async () => { try { await api("/api/paper/capital", {eur: $("#paper-eur").value}); toast("Capital papier mis à jour"); } catch (e) { toast(esc(e.message)); } };
+  document.querySelectorAll("#paper-presets button").forEach(b => { b.onclick = () => { $("#paper-eur").value = b.dataset.eur; }; });
   $("#paper-reset").onclick = async () => {
-    if (!confirm("Effacer toutes les positions papier et repartir du capital indiqué ?")) return;
-    try { await api("/api/paper/reset", {confirm: "RESET", eur: $("#paper-eur").value}); toast("Compte papier remis à zéro"); } catch (e) { toast(esc(e.message)); }
+    const eur = $("#paper-eur").value;
+    if (!confirm("Archiver cette session papier et en ouvrir une nouvelle à " + eur + " € ? Rien n'est effacé : l'ancienne session reste dans les archives du compte.")) return;
+    try { await api("/api/paper/reset", {confirm: "RESET", eur}); toast("Session archivée, nouveau compte à " + eur + " €"); } catch (e) { toast(esc(e.message)); }
   };
   $("#link-phantom").onclick = async () => {
     const provider = (window.phantom && window.phantom.solana) || window.solana;
@@ -89,5 +98,4 @@ async function renderSettings(force) {
     } catch (e) { toast(esc(e.message)); }
   };
 }
-const _prevTabs = window.renderTabs;
-window.renderTabs = function () { if (_prevTabs) _prevTabs(); if (document.querySelector(".tab.active") && document.querySelector(".tab.active").id === "tab-account") renderSettings(); };
+window.renderSettings = renderSettings;
