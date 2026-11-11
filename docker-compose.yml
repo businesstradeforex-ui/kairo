@@ -1,0 +1,40 @@
+# docker compose up -d --build
+# First account: docker compose run --rm kairo python manage.py create-user you --role owner
+# Model: docker compose exec ollama ollama pull qwen3:4b
+# Tunnel: put TUNNEL_TOKEN in .env then docker compose --profile tunnel up -d
+services:
+  kairo:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      OLLAMA_URL: http://ollama:11434
+      KAIRO_LLM_MODEL: ${KAIRO_LLM_MODEL:-qwen3:4b}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:4b}
+      MEMEDESK_UI_DIR: /data/ui
+      KAIRO_LIVE_ENABLED: ${KAIRO_LIVE_ENABLED:-0}
+    volumes:
+      - kairo-data:/data
+    ports:
+      - "127.0.0.1:8787:8787"
+    depends_on:
+      - ollama
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama-models:/root/.ollama
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?set TUNNEL_TOKEN in .env}
+    depends_on:
+      - kairo
+volumes:
+  kairo-data:
+  ollama-models:

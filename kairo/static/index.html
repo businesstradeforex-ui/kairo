@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Kairo">
+<meta name="robots" content="noindex">
+<link rel="manifest" href="__MANIFEST__">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" href="/icon-192.png">
+<title>Kairo · Desk memecoins (papier)</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="toasts"></div>
+<div id="app">
+  <!-- ACCUEIL -->
+  <section class="tab active" id="tab-home">
+    <header class="top">
+      <div class="brand"><img class="bot-av" src="/logo.svg" alt="Kairo"><div><div class="t1" data-i18n="brand">Kairo</div><div class="t2" data-i18n="tag">Desk memecoins Solana</div></div></div>
+      <div class="badges"><div class="badge-paper">PAPIER</div><div class="badge-mode agressif">MODE AGRESSIF</div></div>
+    </header>
+    <div class="portfolio">
+      <div class="lbl">Portefeuille</div>
+      <div class="balance" id="balance"></div>
+      <div class="delta-row"><span id="delta" class="delta"></span><span id="mult" class="pill-mult"></span></div>
+      <div class="chart-wrap"><svg id="eqchart" viewBox="0 0 400 190" preserveAspectRatio="none"></svg><div id="lastpill" class="lastpill"></div></div>
+      <div class="tf" id="tf">
+        <button data-tf="live" class="on live"><i></i>LIVE</button><button data-tf="1h">1H</button><button data-tf="4h">4H</button><button data-tf="1d">1J</button><button data-tf="1w">1S</button><button data-tf="all">TOUT</button>
+      </div>
+    </div>
+    <div class="sec-h"><h2>Agents</h2><span class="green" id="nactifs"></span></div>
+    <div class="carousel" id="carousel"></div>
+    <div class="dots" id="cdots"></div>
+    <div class="sec-h"><h2>Activité</h2><a class="green link" data-go="activity">Tout voir</a></div>
+    <div class="list card" id="act-home"></div>
+    <div class="foot-note" id="foot"></div>
+  </section>
+
+  <!-- AGENTS -->
+  <section class="tab" id="tab-agents">
+    <header class="top"><h1 data-i18n="agents">Agents</h1><div class="badges"><div class="badge-paper">PAPIER</div><div class="badge-mode agressif">MODE AGRESSIF</div></div></header>
+    <div class="pipeline card" id="pipeline"></div>
+    <div id="agents-full"></div>
+    <div class="sec-h"><h2>Notes de l'Analyst</h2><span class="muted small" id="seuil-lbl">seuil —</span></div>
+    <div class="card" id="scores-full"></div>
+    <div class="sec-h"><h2>Éliminations par motif</h2></div>
+    <div class="card" id="kbr"></div>
+  </section>
+
+  <!-- ACTIVITE -->
+  <section class="tab" id="tab-activity">
+    <header class="top"><h1 data-i18n="activity">Activité</h1><div class="badges"><div class="badge-paper">PAPIER</div><div class="badge-mode agressif">MODE AGRESSIF</div></div></header>
+    <div class="seg" id="seg"><button class="on" data-f="all">Tout</button><button data-f="trades">Trades</button><button data-f="kill">Éliminations</button></div>
+    <div class="sec-h"><h2>Positions ouvertes</h2></div>
+    <div class="list card" id="open-full"></div>
+    <div class="sec-h"><h2>Journal</h2></div>
+    <div class="list card" id="act-full"></div>
+  </section>
+
+  <!-- INTENSIF -->
+  <section class="tab" id="tab-intensif">
+    <header class="top"><h1 data-i18n="intensif">Mode intensif</h1><div class="badges"><div class="badge-paper">PAPIER</div><div class="badge-paper" style="display:inline-block;background:#5E5CE6;color:#fff">INTENSIF · 1 000 €</div></div></header>
+    <div class="small muted" style="margin:0 4px 10px">Sous-portefeuille séparé (1 000 € virtuels), en parallèle du Mode profit : scalping papier sur crypto spot et perps (long/short), or tokenisé, paires EUR/USD en stablecoins et tokens Solana liquides, avec flux temps réel publics.</div>
+    <div class="grid2" id="int-stats"></div>
+    <div class="sec-h"><h2>Par stratégie</h2></div>
+    <div class="card" id="int-setups"></div>
+    <div class="sec-h"><h2>Par marché</h2></div>
+    <div class="card" id="int-markets"></div>
+    <div class="sec-h"><h2>Positions ouvertes</h2></div>
+    <div class="list card" id="int-open"></div>
+    <div class="sec-h"><h2>Derniers trades</h2></div>
+    <div class="list card" id="int-recent"></div>
+    <div class="sec-h"><h2>Leçons apprises</h2></div>
+    <div class="card" id="lessons"></div>
+    <div class="foot-note" id="int-foot"></div>
+  </section>
+
+  <!-- COMPTE -->
+  <section class="tab" id="tab-account">
+    <header class="top"><h1 data-i18n="account">Compte</h1><div class="badges"><div class="badge-paper">PAPIER</div><button type="button" id="lang-toggle" class="badge-mode profit">EN</button></div></header>
+    <div id="account"></div>
+    <div id="settings"></div>
+    <div id="session-box"></div>
+  </section>
+
+  <!-- ORDRES & IA LOCALE -->
+  <section class="tab" id="tab-orders">
+    <header class="top"><h1 data-i18n="orders">Ordres</h1><div class="badges"><div class="badge-paper">PAPIER</div><div class="badge-mode agressif">MODE AGRESSIF</div></div></header>
+    <div class="sec-h"><h2>Ordres &amp; IA locale</h2><span class="small" id="ai-state"></span></div>
+    <div class="card" id="ai-status"></div>
+    <div class="card chat" id="chat"></div>
+    <form id="order-form" class="order-form" autocomplete="off">
+      <input id="order-input" maxlength="2000" placeholder="Ex. : passe en mode profit · liquidité min 20k · résumé des 6 dernières heures">
+      <button type="submit" id="order-send">Envoyer</button>
+    </form>
+    <div class="chips" id="order-chips"></div>
+    <div class="sec-h"><h2>Journal d'audit</h2></div>
+    <div class="list card" id="audit"></div>
+    <div class="foot-note">L'IA locale n'exécute qu'une liste blanche d'actions (profil, intensif, paramètres bornés, pause, résumé). Tout le reste est refusé et journalisé. Papier uniquement.</div>
+  </section>
+
+  <!-- TOKEN DETAIL -->
+  <section class="sheet" id="detail">
+    <header class="dhead"><button class="back" id="back">‹</button><div class="dtitle" id="dtitle"></div><div style="width:32px"></div></header>
+    <div class="dsub" id="dsub"></div>
+    <div class="card cchart"><div id="candles"></div><div class="muted tiny" id="csrc"></div></div>
+    <div class="grid2" id="dmetrics"></div>
+    <div id="dcards"></div>
+  </section>
+</div>
+<nav class="bnav" id="bnav">
+  <button data-tab="home" class="on"><span>⌂</span>Accueil</button>
+  <button data-tab="agents"><span>◎</span>Agents</button>
+  <button data-tab="activity"><span>≡</span>Activité</button>
+  <button data-tab="intensif"><span>⚡</span>Intensif</button>
+  <button data-tab="orders"><span>✦</span>Ordres</button>
+  <button data-tab="account"><span>◉</span>Compte</button>
+</nav>
+<script src="lightweight-charts.js"></script>
+<script src="i18n.js?v=kairo1"></script>
+<script src="app.js?v=kairo1"></script>
+<script src="ordres.js?v=kairo1"></script>
+<script src="settings.js?v=kairo1"></script>
+</body>
+</html>

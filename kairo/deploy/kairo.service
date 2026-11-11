@@ -1,0 +1,26 @@
+[Unit]
+Description=Kairo paper trading desk
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__APP__
+Environment=MEMEDESK_DATA=__DATA__
+Environment=DESK_PORT=8787
+Environment=DESK_HOST=127.0.0.1
+Environment=TRUST_PROXY=1
+Environment=KAIRO_ENV=production
+Environment=OLLAMA_URL=http://127.0.0.1:11434
+Environment=OLLAMA_MODEL=__MODEL__
+Environment=KAIRO_LLM_MODEL=__MODEL__
+Environment=MEMEDESK_UI_DIR=__UI__
+ExecStart=__ROOT__/.venv/bin/python __APP__/run.py all
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

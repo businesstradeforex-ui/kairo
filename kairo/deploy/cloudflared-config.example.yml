@@ -1,0 +1,7 @@
+# ~/.cloudflared/config.yml — named Cloudflare Tunnel to Kairo. See docs/exposition.md.
+tunnel: YOUR-TUNNEL-UUID
+credentials-file: /Users/YOU/.cloudflared/YOUR-TUNNEL-UUID.json
+ingress:
+  - hostname: kairo.example.com
+    service: http://127.0.0.1:8787
+  - service: http_status:404

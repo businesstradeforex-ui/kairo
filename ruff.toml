@@ -1,0 +1,17 @@
+line-length = 120
+extend-exclude = [
+  "kairo/scout.py",
+  "kairo/filter.py",
+  "kairo/analyst.py",
+  "kairo/executor.py",
+  "kairo/risk.py",
+  "kairo/logger.py",
+  "kairo/learn.py",
+  "kairo/chart.py",
+  "kairo/intensif.py",
+  "kairo/report.py",
+  "kairo/backtest_chart.py",
+]
+
+[lint]
+select = ["F", "E9"]

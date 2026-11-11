@@ -1,0 +1,16 @@
+.git
+.github
+.venv
+venv
+**/__pycache__
+**/*.db
+**/*.db-*
+logs
+data
+.env
+agent_token.txt
+secret.key
+tests
+docs
+*.md
+!kairo/**/*.md
