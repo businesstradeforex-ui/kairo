@@ -107,6 +107,17 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: dist
+          pattern: "linux-*"
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: "macos-*"
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: "windows-*"
           merge-multiple: true
       - name: Checksums and package manifests
         shell: bash
@@ -175,6 +186,23 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: all
+          pattern: "linux-*"
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          path: all
+          pattern: "macos-*"
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          path: all
+          pattern: "windows-*"
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          path: all
+          pattern: manifests
+          merge-multiple: true
       - name: Release notes
         id: notes
         shell: bash
